@@ -1,6 +1,5 @@
 package com.example.jetpackcompose.service
 
-// PopupService handles periodic notifications based on user settings
 import android.app.*
 import android.content.*
 import android.os.*
@@ -45,6 +44,7 @@ class PopupService : Service() {
             if (delayMillis != -1L) {
                 isNotificationEnabled = true
                 withContext(Dispatchers.Main) {
+                    startForegroundService() // Start Foreground service
                     handler.post(showNotificationRunnable)
                 }
             }
@@ -189,5 +189,11 @@ class PopupService : Service() {
             val manager = getSystemService(NotificationManager::class.java)
             manager.createNotificationChannel(channel) // Register notification channel
         }
+    }
+
+    // Start the service as a Foreground service with a notification
+    private fun startForegroundService() {
+        val notification = getNotification("Popup Service Running")
+        startForeground(1, notification) // Start the service in the foreground with the notification
     }
 }
