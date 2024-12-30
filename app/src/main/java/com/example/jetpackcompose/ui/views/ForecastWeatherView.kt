@@ -22,25 +22,27 @@ import com.example.jetpackcompose.ui.components.WeatherCard
 @Composable
 fun ForecastWeatherView(forecast: List<ForecastItem>) {
     val context = LocalContext.current
-    var hometown by remember { mutableStateOf("") }
-    var apiKey by remember { mutableStateOf("") }
+    var hometown by remember { mutableStateOf("") } // Stores user's hometown
+    var apiKey by remember { mutableStateOf("") } // Stores API key
     val weatherViewModel: WeatherViewModel = viewModel()
-    val errorMessage by weatherViewModel.errorMessage.collectAsState()
+    val errorMessage by weatherViewModel.errorMessage.collectAsState() // Observe error messages
 
-    // Retrieve hometown and apiKey from DataStore
+    // Load hometown and API key from DataStore
     LaunchedEffect(Unit) {
         context.dataStore.data.collect { preferences ->
             hometown = preferences[Keys.HOMETOWN_KEY] ?: ""
             apiKey = preferences[Keys.API_TOKEN_KEY] ?: ""
 
+            // Fetch forecast if both hometown and API key are available
             if (hometown.isNotEmpty() && apiKey.isNotEmpty()) {
                 weatherViewModel.fetchForecastData(hometown, apiKey)
             }
         }
     }
 
-    val searchQuery = rememberSaveable { mutableStateOf("") }
+    val searchQuery = rememberSaveable { mutableStateOf("") } // Stores search query
 
+    // Search bar for forecast
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -52,8 +54,10 @@ fun ForecastWeatherView(forecast: List<ForecastItem>) {
             onQueryChanged = { query ->
                 searchQuery.value = query
                 if (query.isNotEmpty()) {
+                    // Fetch forecast for searched city
                     weatherViewModel.fetchForecastData(query, apiKey)
                 } else {
+                    // Fetch hometown forecast if query is empty
                     if (hometown.isNotEmpty() && apiKey.isNotEmpty()) {
                         weatherViewModel.fetchForecastData(hometown, apiKey)
                     }
@@ -62,6 +66,7 @@ fun ForecastWeatherView(forecast: List<ForecastItem>) {
         )
     }
 
+    // Show error message if present
     errorMessage?.let {
         Text(
             text = it,
@@ -74,6 +79,7 @@ fun ForecastWeatherView(forecast: List<ForecastItem>) {
         )
     }
 
+    // Main layout for the forecast view
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -83,6 +89,7 @@ fun ForecastWeatherView(forecast: List<ForecastItem>) {
     ) {
         Spacer(modifier = Modifier.height(24.dp))
 
+        // Show a message if no hometown is set
         if (searchQuery.value.isEmpty() && hometown.isEmpty()) {
             Text(
                 text = "Set your hometown in settings",
@@ -93,6 +100,7 @@ fun ForecastWeatherView(forecast: List<ForecastItem>) {
                 modifier = Modifier.padding(16.dp)
             )
         } else if (forecast.isNotEmpty()) {
+            // Display forecast for either searched city or hometown
             Text(
                 text = "Forecast for ${searchQuery.value.takeIf { it.isNotEmpty() } ?: hometown}",
                 style = MaterialTheme.typography.headlineLarge.copy(
@@ -104,29 +112,17 @@ fun ForecastWeatherView(forecast: List<ForecastItem>) {
                     .align(Alignment.CenterHorizontally)
             )
 
-            // Display forecast data
+            // Show forecast items in a scrollable list
             LazyColumn(
                 modifier = Modifier.fillMaxWidth(),
                 contentPadding = PaddingValues(vertical = 8.dp)
             ) {
-                items(items = forecast) { forecastItem -> // Pass `forecast` as the list
+                items(items = forecast) { forecastItem ->
                     WeatherCard(
-                        forecastItem = forecastItem // Each item in the list is a `ForecastItem`
+                        forecastItem = forecastItem // Display each forecast item
                     )
                 }
             }
-
         }
-
-        Text(
-            text = "TODO: Implement me :)",
-            style = MaterialTheme.typography.headlineLarge.copy(
-                fontSize = 18.sp,
-                color = Color.Black
-            ),
-            modifier = Modifier
-                .padding(bottom = 32.dp)
-                .align(Alignment.CenterHorizontally)
-        )
     }
 }

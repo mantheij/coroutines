@@ -1,5 +1,6 @@
 package com.example.jetpackcompose.service
 
+// PopupService handles periodic notifications based on user settings
 import android.app.*
 import android.content.*
 import android.os.*
@@ -19,12 +20,13 @@ import kotlinx.coroutines.flow.map
 
 class PopupService : Service() {
 
-    private val handler = Handler(Looper.getMainLooper())
-    private var delayMillis: Long = -1L
-    private var i = 0
-    private val dataStore by lazy { applicationContext.dataStore }
-    private var isNotificationEnabled: Boolean = false
+    private val handler = Handler(Looper.getMainLooper()) // Main thread handler for notifications
+    private var delayMillis: Long = -1L // Delay for notifications in milliseconds
+    private var i = 0 // Counter for notification messages
+    private val dataStore by lazy { applicationContext.dataStore } // Lazy initialization of DataStore
+    private var isNotificationEnabled: Boolean = false // Flag for notification status
 
+    // BroadcastReceiver to listen for timer updates
     private val updateReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             val newTimerOption = intent?.getStringExtra("timer_option") ?: "Deactivated"
@@ -34,13 +36,12 @@ class PopupService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        createNotificationChannel()
+        createNotificationChannel() // Create notification channel
 
-        // Start the notification logic if the timer option is valid
+        // Initialize notification logic from settings
         CoroutineScope(Dispatchers.IO).launch {
             val timerOption = fetchTimerOptionFromSettings()
             delayMillis = timerOptionToMillis(timerOption)
-
             if (delayMillis != -1L) {
                 isNotificationEnabled = true
                 withContext(Dispatchers.Main) {
@@ -49,57 +50,59 @@ class PopupService : Service() {
             }
         }
 
-        registerUpdateReceiver()
-        initializeTimerFromSettings()
+        registerUpdateReceiver() // Register receiver for timer updates
+        initializeTimerFromSettings() // Initialize timer
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        handler.removeCallbacks(showNotificationRunnable)
-        unregisterReceiver(updateReceiver)
+        handler.removeCallbacks(showNotificationRunnable) // Stop notifications
+        unregisterReceiver(updateReceiver) // Unregister receiver
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (delayMillis != -1L) {
-            handler.removeCallbacks(showNotificationRunnable)
+            handler.removeCallbacks(showNotificationRunnable) // Restart notifications
             handler.post(showNotificationRunnable)
         }
-        return START_STICKY
+        return START_STICKY // Keep service alive
     }
 
-    override fun onBind(intent: Intent?): IBinder? = null
+    override fun onBind(intent: Intent?): IBinder? = null // Service binding not used
 
+    // Runnable to show notifications periodically
     private val showNotificationRunnable = object : Runnable {
         override fun run() {
             if (isNotificationEnabled) {
-                sendNotification("Hello World $i")
+                sendNotification("Hello World $i") // Send notification
                 i++
             }
-            handler.postDelayed(this, delayMillis)
+            handler.postDelayed(this, delayMillis) // Schedule next notification
         }
     }
 
+    // Update notification timer based on new option
     private fun updateTimerOption(option: String) {
         delayMillis = timerOptionToMillis(option)
         isNotificationEnabled = delayMillis != -1L
         handler.removeCallbacks(showNotificationRunnable)
 
         if (delayMillis == -1L) {
-            stopSelf()
+            stopSelf() // Stop service if timer is deactivated
         } else {
             handler.postDelayed(showNotificationRunnable, delayMillis)
         }
     }
 
+    // Fetch saved timer option from DataStore
     private suspend fun fetchTimerOptionFromSettings(): String {
         val key = stringPreferencesKey("timer_option_key")
-        val timerOption = dataStore.data.map { preferences ->
+        return dataStore.data.map { preferences ->
             preferences[key] ?: "Deactivated"
         }.first()
-
-        return timerOption
     }
 
+    // Register receiver for timer updates
     private fun registerUpdateReceiver() {
         ContextCompat.registerReceiver(
             this,
@@ -109,7 +112,7 @@ class PopupService : Service() {
         )
     }
 
-
+    // Convert timer option string to milliseconds
     private fun timerOptionToMillis(option: String): Long {
         return when (option) {
             "10s" -> 10_000L
@@ -121,11 +124,11 @@ class PopupService : Service() {
         }
     }
 
+    // Initialize notification timer from saved settings
     private fun initializeTimerFromSettings() {
         CoroutineScope(Dispatchers.IO).launch {
             val timerOption = fetchTimerOptionFromSettings()
             delayMillis = timerOptionToMillis(timerOption)
-
             if (delayMillis != -1L) {
                 isNotificationEnabled = true
                 handler.post(showNotificationRunnable)
@@ -133,21 +136,22 @@ class PopupService : Service() {
         }
     }
 
-
+    // Send notification with given message
     private fun sendNotification(message: String) {
         if (ActivityCompat.checkSelfPermission(
                 this@PopupService,
                 Manifest.permission.POST_NOTIFICATIONS
             ) != PackageManager.PERMISSION_GRANTED
         ) {
-            return
+            return // Return if notification permission is not granted
         }
 
         val notificationManager = NotificationManagerCompat.from(this)
         val notification = getNotification(message)
-        notificationManager.notify(1, notification)
+        notificationManager.notify(1, notification) // Show notification
     }
 
+    // Build notification with given content
     private fun getNotification(contentText: String): Notification {
         val intent = Intent(this, MainActivity::class.java)
         val pendingIntent = PendingIntent.getActivity(
@@ -158,16 +162,17 @@ class PopupService : Service() {
         )
 
         return NotificationCompat.Builder(this, "popup_service_channel")
-            .setContentTitle("Popup Service")
-            .setContentText(contentText)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setContentTitle("Popup Service") // Notification title
+            .setContentText(contentText) // Notification message
+            .setSmallIcon(android.R.drawable.ic_dialog_info) // Icon for notification
+            .setPriority(NotificationCompat.PRIORITY_MAX) // High priority
             .setDefaults(NotificationCompat.DEFAULT_SOUND or NotificationCompat.DEFAULT_VIBRATE)
-            .setContentIntent(pendingIntent)
-            .setAutoCancel(true)
+            .setContentIntent(pendingIntent) // Launch MainActivity on click
+            .setAutoCancel(true) // Auto-dismiss notification on click
             .build()
     }
 
+    // Create notification channel for Android O and above
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
@@ -182,7 +187,7 @@ class PopupService : Service() {
             }
 
             val manager = getSystemService(NotificationManager::class.java)
-            manager.createNotificationChannel(channel)
+            manager.createNotificationChannel(channel) // Register notification channel
         }
     }
 }
